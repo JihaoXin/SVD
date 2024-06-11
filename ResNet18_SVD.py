@@ -26,7 +26,7 @@ num_epochs = 10
 batch_size = 64
 learning_rate = 0.01
 momentum = 0.9
-k_ratio=0.5 # Fraction of singular values to keep
+k_ratio=0.8 # Fraction of singular values to keep
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 torch.cuda.set_device(2)
 
@@ -120,6 +120,5 @@ for epoch in range(num_epochs):
                     logging.info(f"Layer: {name}, Original shape: {s.shape}, Clamped shape: {s_clamped.shape}, Topk shape: {topk_values.shape}, Error: {error}")
         optimizer.step()
         logging.info(f"Epoch [{epoch+1}/{num_epochs}], Batch: {current_batch}/{batches_per_epoch}, Loss: {loss.item()}") 
-    logging.info(f"Epoch [{epoch+1}/{num_epochs}], Loss: {loss.item()}")
 
 logging.info("Training complete")

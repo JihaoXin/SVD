@@ -82,6 +82,5 @@ for epoch in range(num_epochs):
         loss.backward()
         optimizer.step()
         logging.info(f"Epoch [{epoch+1}/{num_epochs}], Batch: {current_batch}/{batches_per_epoch}, Loss: {loss.item()}") 
-    logging.info(f"Epoch [{epoch+1}/{num_epochs}], Loss: {loss.item()}")
 
 logging.info("Training complete")
