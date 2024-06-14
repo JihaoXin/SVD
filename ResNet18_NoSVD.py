@@ -32,7 +32,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 torch.cuda.set_device(0)
 
 # Configure logging
-logging.basicConfig(filename=f'logs/ResNet18_Cifar10_NoSVD_training', level=logging.INFO,
+logging.basicConfig(filename=f'logs/ResNet18_grad', level=logging.INFO,
                     format='%(asctime)s - %(levelname)s - %(message)s', filemode='w')
 logging.info(f"Number of epochs: {num_epochs}")
 logging.info(f"Batch size: {batch_size}")
@@ -66,21 +66,25 @@ model.train()
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.SGD(model.parameters(), lr=learning_rate, momentum=momentum)
 
-# Training loop
-for epoch in range(num_epochs):
-    current_batch = 0
-    for images, labels in train_loader:
-        current_batch += 1
-        images, labels = images.to(device), labels.to(device)
+
+for name, param in model.named_parameters():
+    logging.info(f"Layer: {name} | Size: {param.size()}")
+
+# # Training loop
+# for epoch in range(num_epochs):
+#     current_batch = 0
+#     for images, labels in train_loader:
+#         current_batch += 1
+#         images, labels = images.to(device), labels.to(device)
         
-        # Forward pass
-        outputs = model(images)
-        loss = criterion(outputs, labels)
+#         # Forward pass
+#         outputs = model(images)
+#         loss = criterion(outputs, labels)
 
-        # Backward pass
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-        logging.info(f"Epoch [{epoch+1}/{num_epochs}], Batch: {current_batch}/{batches_per_epoch}, Loss: {loss.item()}") 
+#         # Backward pass
+#         optimizer.zero_grad()
+#         loss.backward()
+#         optimizer.step()
+#         logging.info(f"Epoch [{epoch+1}/{num_epochs}], Batch: {current_batch}/{batches_per_epoch}, Loss: {loss.item()}") 
 
-logging.info("Training complete")
+# logging.info("Training complete")

@@ -26,13 +26,13 @@ num_epochs = 10
 batch_size = 64
 learning_rate = 0.01
 momentum = 0.9
-k_ratio=0.8 # Fraction of singular values to keep
+k_ratio=0.1 # Fraction of singular values to keep
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-torch.cuda.set_device(2)
+torch.cuda.set_device(0)
 
 # Configure logging
 logging.basicConfig(filename=f'logs/ResNet18_Cifar10_SVD_training_k={k_ratio}', level=logging.INFO,
-                    format='%(asctime)s - %(levelname)s - %(message)s')
+                    format='%(asctime)s - %(levelname)s - %(message)s', filemode='w')
 logging.info(f"Number of epochs: {num_epochs}")
 logging.info(f"Batch size: {batch_size}")
 logging.info(f"Learning rate: {learning_rate}")
@@ -89,23 +89,21 @@ for epoch in range(num_epochs):
                     if h == 1 and w == 1:
                         grad_2d = grad.view(n, c)  # Special case for 1x1 convolutions
                     else:
-                        grad_2d = grad.view(n * c, -1)  # Flatten to 2D tensor
+                        grad_2d = grad.permute(0, 2, 1, 3).reshape(n * h, c * w)  # Flatten by combining n and h, c and w
                     u, s, v = torch.svd(grad_2d)
                     s_clamped = torch.zeros_like(s)
                     k = math.ceil(len(s) * k_ratio)
                     topk_values, _ = torch.topk(s, k)
-                    # logging.info(f"Layer: {name}, Original shape: {s.shape}, Clamped shape: {s_clamped.shape}, Topk shape: {topk_values.shape}")
                     s_clamped[:k] = topk_values
                     s_clamped_diag = torch.diag_embed(s_clamped)
-
                     grad_modified_2d = torch.matmul(u, torch.matmul(s_clamped_diag, v.transpose(-2, -1)))
                     if h == 1 and w == 1:
-                        grad_modified = grad_modified_2d.view(n, c, h, w)  # Special case for 1x1 convolutions
+                        grad_modified = grad_modified_2d.view(n, c, h, w).contiguous()  # Special case for 1x1 convolutions
                     else:
-                        grad_modified = grad_modified_2d.view(n, c, h, w)
+                        grad_modified = grad_modified_2d.view(n, h, c, w).permute(0, 2, 1, 3).contiguous()  # Reshape back and permute
                     param.grad = grad_modified.to(param.grad.device)
                     error = torch.norm(grad - grad_modified)
-                    logging.info(f"Layer: {name}, Original shape: {s.shape}, Clamped shape: {s_clamped.shape}, Topk shape: {topk_values.shape}, Error: {error}")
+                    logging.info(f"Layer: {name}, ,Gradient shape: {grad.shape}, Converted Shape = {grad_2d.shape}; Singular Value Original shape: {s.shape}, Clamped shape: {s_clamped.shape}, Topk shape: {topk_values.shape}, Error: {error}")
 
                 elif grad.ndim == 2:  # Handle 2D gradients for FC layers
                     u, s, v = torch.svd(grad)
@@ -117,7 +115,7 @@ for epoch in range(num_epochs):
                     grad_modified = torch.matmul(u, torch.matmul(s_clamped_diag, v.transpose(-2, -1)))
                     param.grad = grad_modified.to(param.grad.device)
                     error = torch.norm(grad - grad_modified)
-                    logging.info(f"Layer: {name}, Original shape: {s.shape}, Clamped shape: {s_clamped.shape}, Topk shape: {topk_values.shape}, Error: {error}")
+                    logging.info(f"Layer: {name}, ,Gradient shape: {grad.shape}; Singular Value Original shape: {s.shape}, Clamped shape: {s_clamped.shape}, Topk shape: {topk_values.shape}, Error: {error}")
         optimizer.step()
         logging.info(f"Epoch [{epoch+1}/{num_epochs}], Batch: {current_batch}/{batches_per_epoch}, Loss: {loss.item()}") 
 
