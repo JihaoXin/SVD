@@ -26,12 +26,15 @@ num_epochs = 10
 batch_size = 64
 learning_rate = 0.01
 momentum = 0.9
-k_ratio=0.1 # Fraction of singular values to keep
+k_ratio=1.0 # Fraction of singular values to keep
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+folder_path = f'./dump/SVD_Whole_TopK_{k_ratio}'
+if not os.path.exists(folder_path):
+    os.makedirs(folder_path)
 torch.cuda.set_device(0)
 
 # Configure logging
-logging.basicConfig(filename=f'logs/ResNet18_Cifar10_SVD_training_k={k_ratio}', level=logging.INFO,
+logging.basicConfig(filename=f'logs/ResNet18_Cifar10_SVD_training_k={k_ratio}_singular_values', level=logging.INFO,
                     format='%(asctime)s - %(levelname)s - %(message)s', filemode='w')
 logging.info(f"Number of epochs: {num_epochs}")
 logging.info(f"Batch size: {batch_size}")
@@ -53,7 +56,6 @@ train_dataset = datasets.CIFAR10(root='./data', train=True, download=True, trans
 train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 dataset_size = len(train_dataset)
 batches_per_epoch = (dataset_size + batch_size - 1) // batch_size
-
 
 # Load ResNet50 model
 model = models.resnet50(pretrained=False)  # Start with random weights
@@ -81,6 +83,7 @@ for epoch in range(num_epochs):
         loss.backward()
 
         # Apply SVD on gradients and update
+        tensors_dict = {}
         for name, param in model.named_parameters():
             if param.grad is not None:
                 grad = param.grad.detach()
@@ -104,7 +107,7 @@ for epoch in range(num_epochs):
                     param.grad = grad_modified.to(param.grad.device)
                     error = torch.norm(grad - grad_modified)
                     logging.info(f"Layer: {name}, ,Gradient shape: {grad.shape}, Converted Shape = {grad_2d.shape}; Singular Value Original shape: {s.shape}, Clamped shape: {s_clamped.shape}, Topk shape: {topk_values.shape}, Error: {error}")
-
+                    tensors_dict[name] = s
                 elif grad.ndim == 2:  # Handle 2D gradients for FC layers
                     u, s, v = torch.svd(grad)
                     s_clamped = torch.zeros_like(s)
@@ -116,6 +119,9 @@ for epoch in range(num_epochs):
                     param.grad = grad_modified.to(param.grad.device)
                     error = torch.norm(grad - grad_modified)
                     logging.info(f"Layer: {name}, ,Gradient shape: {grad.shape}; Singular Value Original shape: {s.shape}, Clamped shape: {s_clamped.shape}, Topk shape: {topk_values.shape}, Error: {error}")
+                    tensors_dict[name] = s
+        torch.save(tensors_dict, f'{folder_path}/gradients_singular_epoch{epoch}_batch_{current_batch}.pt')
+
         optimizer.step()
         logging.info(f"Epoch [{epoch+1}/{num_epochs}], Batch: {current_batch}/{batches_per_epoch}, Loss: {loss.item()}") 
 
